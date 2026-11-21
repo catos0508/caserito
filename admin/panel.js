@@ -263,7 +263,7 @@
         <select class="select" id="fs"><option value="">Todos</option><option value="active">Activos</option><option value="suspended">Suspendidos</option></select></div></div>
       <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Teléfono</th><th>Registro</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
     const rows = () => { const q = document.getElementById('q').value.trim().toLowerCase(), r = document.getElementById('fr').value, s = document.getElementById('fs').value; return users.filter((u) => (!q || (u.name + ' ' + u.email).toLowerCase().includes(q)) && (!r || u.role === r) && (!s || u.status === s)); };
-    const draw = () => { document.getElementById('tb').innerHTML = rows().map((u) => `<tr><td><div class="cell-main">${esc(u.name)}</div><div class="cell-sub">${esc(u.email)}</div></td>
+    const draw = () => { document.getElementById('tb').innerHTML = rows().map((u) => `<tr><td><div class="user-cell">${u.avatar ? `<img class="uav" src="${esc(u.avatar)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : `<span class="uav">${esc((u.name || '?').trim().charAt(0).toUpperCase())}</span>`}<div style="min-width:0"><div class="cell-main">${esc(u.name)}</div><div class="cell-sub">${esc(u.email)}</div></div></div></td>
       <td><span class="pill ${u.role === 'admin' ? 'p-brand' : u.role === 'seller' ? 'p-info' : 'p-gray'}">${esc(ROLE[u.role] || u.role)}</span></td>
       <td>${u.status === 'active' ? '<span class="pill p-ok">Activo</span>' : '<span class="pill p-bad">Suspendido</span>'}</td><td class="small">${esc(u.phone || '—')}</td><td class="small muted">${esc(fdate(u.created_at, false))}</td>
       <td><div class="actions">${u.role === 'admin' ? '' : u.status === 'active' ? `<button class="btn sm danger" data-u="${u.id}" data-s="suspended">Suspender</button>` : `<button class="btn sm ok" data-u="${u.id}" data-s="active">Reactivar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin resultados</td></tr>'; };
@@ -341,12 +341,42 @@
 
   VIEWS.denuncias = async (main) => {
     const reps = ok(await sb.rpc('admin_reports'));
-    main.innerHTML = head('Denuncias', `${num(reps.filter((r) => r.status === 'abierta').length)} abiertas · ${num(reps.length)} en total`) +
-      `<div class="card">${reps.map((r) => `<div class="report"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(r.reporter || 'Usuario')}</b> <span class="small muted">${esc(r.reporter_email || '')}</span><div class="small muted">Conversación con ${esc(r.store || 'tienda')}${r.buyer_name ? ' · cliente ' + esc(r.buyer_name) : ''} · ${esc(fdate(r.created_at))}</div></div>
+    const card = (r) => {
+      const top = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>${esc(r.reporter || 'Usuario')}</b> <span class="small muted">${esc(r.reporter_email || '')}</span>
+        <div class="small muted">${r.product_id != null ? 'Producto de ' + esc(r.store || 'tienda') : r.conversation_id != null ? 'Conversación con ' + esc(r.store || 'tienda') + (r.buyer_name ? ' · cliente ' + esc(r.buyer_name) : '') : 'Producto ya eliminado'} · ${esc(fdate(r.created_at))}</div></div>
         <div style="display:flex;gap:8px;align-items:center">${r.status === 'abierta' ? '<span class="pill p-bad">Abierta</span>' : '<span class="pill p-gray">Revisada</span>'}${r.status === 'abierta' ? `<button class="btn sm" data-rev="${r.id}">Marcar revisada</button>` : ''}</div></div>
-        <div><span class="small muted">Motivo:</span> ${esc(r.reason)}</div>
-        ${r.last_messages && r.last_messages.length ? `<div class="msgs">${r.last_messages.slice().reverse().map((m) => `<div><b>${esc(m.from)}:</b>${esc(m.body || '(compartió un producto)')}</div>`).join('')}</div>` : ''}</div>`).join('') || '<div class="empty">No hay denuncias. 👍</div>'}</div>`;
+        <div><span class="small muted">Motivo:</span> ${esc(r.reason)}</div>`;
+      const prod = r.product_id != null ? `<div class="rep-prod">${r.product_photo ? `<img src="${esc(r.product_photo)}" alt="" loading="lazy">` : '<span class="rep-ph">📦</span>'}
+        <div style="flex:1;min-width:0"><div class="cell-main">${esc(r.product_name || '')}</div><div class="cell-sub">${clp(r.product_price || 0)} · ${esc(r.store || '')} · <b>${num(r.product_reports || 0)}</b> denuncia(s)</div>
+        <div style="margin-top:4px">${r.product_active ? '<span class="pill p-ok">Publicado</span>' : '<span class="pill p-gray">Oculto</span>'}</div></div>
+        <div class="actions">${r.product_active ? `<button class="btn sm" data-pp="${r.product_id}" data-a="0">Ocultar</button>` : `<button class="btn sm" data-pp="${r.product_id}" data-a="1">Publicar</button>`}<button class="btn sm danger" data-delp="${r.product_id}" data-n="${esc(r.product_name || '')}" data-st="${esc(r.store || '')}">Eliminar producto</button></div></div>` : '';
+      const msgs = r.last_messages && r.last_messages.length ? `<div class="msgs">${r.last_messages.slice().reverse().map((m) => `<div><b>${esc(m.from)}:</b>${esc(m.body || '(compartió un producto)')}</div>`).join('')}</div>` : '';
+      return `<div class="report">${top}${prod}${msgs}</div>`;
+    };
+    const open = reps.filter((r) => r.status === 'abierta');
+    main.innerHTML = head('Denuncias', `${num(open.length)} abiertas · ${num(reps.length)} en total`) +
+      `<div class="card pad rules-box"><b>Reglas que se vigilan:</b> copias/réplicas, drogas, medicamentos, armas, tabaco/vapeadores, documentos falsos, contenido sexual, cosas robadas y cuentas piratas. El sistema bloquea solo los textos con esas palabras y oculta automáticamente un producto con 3 denuncias de personas distintas. Revisa, elimina el producto si incumple y suspende la tienda o el usuario si es grave.</div>
+      <div class="toolbar" style="margin:14px 0"><select class="select" id="ft"><option value="">Todas</option><option value="p">Productos</option><option value="c">Conversaciones</option></select><select class="select" id="fs"><option value="abierta">Abiertas</option><option value="">Todas</option></select></div>
+      <div class="card" id="rl"></div>`;
+    const draw = () => { const t = document.getElementById('ft').value, st = document.getElementById('fs').value;
+      document.getElementById('rl').innerHTML = reps.filter((r) => (!st || r.status === st) && (!t || (t === 'p' ? r.conversation_id == null : r.conversation_id != null))).map(card).join('') || '<div class="empty">No hay denuncias. 👍</div>'; };
+    draw(); ['ft', 'fs'].forEach((id) => document.getElementById(id).addEventListener('input', draw));
     main.addEventListener('click', async (e) => {
+      const d = e.target.closest('[data-delp]');
+      if (d) {
+        if (!(await confirmDelete('¿Eliminar "' + d.dataset.n + '"?', `El producto de <b>${esc(d.dataset.st)}</b> se borrará para siempre. La denuncia queda marcada como revisada.`))) return;
+        d.disabled = true; const pid = Number(d.dataset.delp);
+        try { ok(await sb.rpc('admin_delete_product', { p_id: pid }));
+          for (const r of reps.filter((x) => x.product_id === pid && x.status === 'abierta')) { try { ok(await sb.rpc('admin_review_report', { p_id: r.id })); } catch { /* sigue */ } }
+          toast('Producto eliminado'); route(); } catch (er) { toast(er.message); d.disabled = false; }
+        return;
+      }
+      const pp = e.target.closest('[data-pp]');
+      if (pp) { pp.disabled = true;
+        try { ok(await sb.rpc('admin_set_product_active', { p_id: Number(pp.dataset.pp), p_active: pp.dataset.a === '1' })); reps.filter((x) => x.product_id === Number(pp.dataset.pp)).forEach((x) => { x.product_active = pp.dataset.a === '1'; }); toast(pp.dataset.a === '1' ? 'Producto publicado' : 'Producto ocultado'); draw(); }
+        catch (er) { toast(/LIMITE_PLAN/.test(er.message) ? 'La tienda llegó al límite de su plan' : er.message); pp.disabled = false; }
+        return;
+      }
       const b = e.target.closest('[data-rev]'); if (!b) return; b.disabled = true;
       try { ok(await sb.rpc('admin_review_report', { p_id: Number(b.dataset.rev) })); toast('Denuncia revisada'); route(); } catch (er) { toast(er.message); b.disabled = false; }
     });

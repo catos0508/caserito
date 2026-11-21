@@ -181,3 +181,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:820px){.shell{grid-template-columns:minmax(0,1fr)}.kpis,.alerts{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .modal-bg{position:fixed;inset:0;background:rgba(10,10,14,.5);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px;animation:rise .15s ease}
 .modal{width:100%;max-width:440px}
+.user-cell{display:flex;align-items:center;gap:10px}
+.uav{width:34px;height:34px;border-radius:50%;flex:none;object-fit:cover;display:inline-flex;align-items:center;justify-content:center;background:var(--brand-bg,#FDE8E9);color:var(--brand,#C2262E);font-weight:800;font-size:14px}
+.rep-prod{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:10px;border:1px solid var(--line,#E7E5E0);border-radius:12px}
+.rep-prod img,.rep-ph{width:64px;height:64px;border-radius:10px;object-fit:cover;flex:none;display:flex;align-items:center;justify-content:center;background:#F4F3EF;font-size:26px}
+.rules-box{border-left:4px solid var(--bad,#C2262E);font-size:14px;line-height:1.5}
