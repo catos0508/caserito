@@ -209,11 +209,19 @@
         <td>${pill(ST_STORE, s.status)}</td>
         <td><select class="select" style="height:34px" data-plan="${s.id}" aria-label="Plan de ${esc(s.name)}">${Object.entries(PLAN).map(([k, v]) => `<option value="${k}" ${s.plan === k ? 'selected' : ''}>${v}</option>`).join('')}</select></td>
         <td class="num">${num(s.products?.[0]?.count)}</td><td class="num">${num(s.followers)}</td><td class="small muted">${esc(fdate(s.created_at, false))}</td>
-        <td><div class="actions">${s.status !== 'approved' ? `<button class="btn sm ok" data-st="approved" data-id="${s.id}">Aprobar</button>` : ''}${s.status !== 'suspended' ? `<button class="btn sm danger" data-st="suspended" data-id="${s.id}">Suspender</button>` : ''}</div></td></tr>`).join('') || '<tr><td colspan="8" class="empty">No hay tiendas con esos filtros</td></tr>';
+        <td><div class="actions">${s.status !== 'approved' ? `<button class="btn sm ok" data-st="approved" data-id="${s.id}">Aprobar</button>` : ''}${s.status !== 'suspended' ? `<button class="btn sm danger" data-st="suspended" data-id="${s.id}">Suspender</button>` : ''}<button class="btn sm danger" data-del-store="${s.id}" title="Eliminar tienda">Eliminar</button></div></td></tr>`).join('') || '<tr><td colspan="8" class="empty">No hay tiendas con esos filtros</td></tr>';
     };
     draw();
     ['q', 'fs', 'fp'].forEach((id) => document.getElementById(id).addEventListener('input', draw));
     main.addEventListener('click', async (e) => {
+      const d = e.target.closest('[data-del-store]');
+      if (d) {
+        const st = stores.find((x) => x.id === Number(d.dataset.delStore));
+        if (!(await confirmDelete('¿Eliminar la tienda "' + st.name + '"?', `Se borrarán para siempre la tienda, sus <b>${num(st.products?.[0]?.count)} productos</b>, sus vivos, pregones, chats y pedidos. La cuenta del dueño (${esc(st.profiles?.email)}) no se borra. Si solo quieres ocultarla, usa <b>Suspender</b>.`))) return;
+        d.disabled = true;
+        try { ok(await sb.rpc('admin_delete_store', { p_id: st.id })); stores.splice(stores.indexOf(st), 1); toast('Tienda eliminada'); draw(); } catch (er) { toast(er.message); d.disabled = false; }
+        return;
+      }
       const b = e.target.closest('[data-st]'); if (!b) return;
       if (b.dataset.st === 'suspended' && !confirmInline(b, '¿Suspender?')) return;
       b.disabled = true;
@@ -227,6 +235,23 @@
     });
     document.getElementById('x').onclick = () => csv('tiendas', rows().map((s) => ({ tienda: s.name, sector: CAT[s.category], ciudad: s.city, whatsapp: s.whatsapp, dueno: s.profiles?.name, correo: s.profiles?.email, estado: (ST_STORE[s.status] || [s.status])[0], plan: PLAN[s.plan], productos: s.products?.[0]?.count, seguidores: s.followers, creada: fdate(s.created_at, false) })));
   };
+  // Ventana de confirmación para acciones que no se pueden deshacer: hay que escribir ELIMINAR
+  function confirmDelete(title, detail) {
+    return new Promise((resolve) => {
+      const bg = document.createElement('div'); bg.className = 'modal-bg';
+      bg.innerHTML = `<form class="modal card pad" role="dialog" aria-modal="true" aria-labelledby="mt"><h3 id="mt">${esc(title)}</h3><p class="small muted" style="margin:6px 0 12px">${detail}</p>
+        <div class="field"><label for="mc">Escribe <b>ELIMINAR</b> para confirmar</label><input class="input" id="mc" autocomplete="off" autocapitalize="characters"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" type="button" data-x>Cancelar</button><button class="btn" style="background:var(--bad);border-color:var(--bad);color:#fff" type="submit" disabled>Eliminar definitivamente</button></div></form>`;
+      document.body.appendChild(bg);
+      const inp = bg.querySelector('#mc'), go = bg.querySelector('[type=submit]'); inp.focus();
+      const close = (v) => { bg.remove(); resolve(v); };
+      inp.oninput = () => { go.disabled = inp.value.trim().toUpperCase() !== 'ELIMINAR'; };
+      bg.querySelector('[data-x]').onclick = () => close(false);
+      bg.onclick = (e) => { if (e.target === bg) close(false); };
+      bg.querySelector('form').onsubmit = (e) => { e.preventDefault(); if (!go.disabled) close(true); };
+      document.addEventListener('keydown', function k(e) { if (e.key === 'Escape') { document.removeEventListener('keydown', k); close(false); } });
+    });
+  }
   // confirmación de dos toques (sin ventanas emergentes)
   function confirmInline(b, txt) { if (b.dataset.armed) return true; b.dataset.armed = '1'; const o = b.textContent; b.textContent = txt; setTimeout(() => { delete b.dataset.armed; b.textContent = o; }, 3000); return false; }
 
@@ -276,9 +301,17 @@
     const rows = () => { const q = document.getElementById('q').value.trim().toLowerCase(), a = document.getElementById('fa').value; return prods.filter((p) => (!q || (p.name + ' ' + (p.stores?.name || '')).toLowerCase().includes(q)) && (a === '' || String(+p.active) === a)); };
     const draw = () => { document.getElementById('tb').innerHTML = rows().slice(0, 500).map((p) => `<tr><td><div class="cell-main">${esc(p.name)}</div><div class="cell-sub">${esc((p.options || '').slice(0, 60))}</div></td><td>${esc(p.stores?.name || '')}</td><td class="num">${clp(p.price)}</td>
       <td>${p.active ? '<span class="pill p-ok">Publicado</span>' : '<span class="pill p-gray">Oculto</span>'}</td><td class="small muted">${esc(fdate(p.created_at, false))}</td>
-      <td><div class="actions">${p.active ? `<button class="btn sm danger" data-p="${p.id}" data-a="0">Ocultar</button>` : `<button class="btn sm" data-p="${p.id}" data-a="1">Publicar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin productos</td></tr>'; };
+      <td><div class="actions">${p.active ? `<button class="btn sm" data-p="${p.id}" data-a="0">Ocultar</button>` : `<button class="btn sm" data-p="${p.id}" data-a="1">Publicar</button>`}<button class="btn sm danger" data-del-prod="${p.id}">Eliminar</button></div></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin productos</td></tr>'; };
     draw(); ['q', 'fa'].forEach((id) => document.getElementById(id).addEventListener('input', draw));
     main.addEventListener('click', async (e) => {
+      const d = e.target.closest('[data-del-prod]');
+      if (d) {
+        const pr = prods.find((x) => x.id === Number(d.dataset.delProd));
+        if (!(await confirmDelete('¿Eliminar "' + pr.name + '"?', `El producto de <b>${esc(pr.stores?.name || '')}</b> se borrará para siempre. Los pedidos anteriores se conservan con su nombre. Si solo quieres sacarlo de la vista, usa <b>Ocultar</b>.`))) return;
+        d.disabled = true;
+        try { ok(await sb.rpc('admin_delete_product', { p_id: pr.id })); prods.splice(prods.indexOf(pr), 1); toast('Producto eliminado'); draw(); } catch (er) { toast(er.message); d.disabled = false; }
+        return;
+      }
       const b = e.target.closest('[data-p]'); if (!b) return; b.disabled = true;
       try { ok(await sb.rpc('admin_set_product_active', { p_id: Number(b.dataset.p), p_active: b.dataset.a === '1' })); prods.find((p) => p.id === Number(b.dataset.p)).active = b.dataset.a === '1'; toast(b.dataset.a === '1' ? 'Producto publicado' : 'Producto ocultado'); draw(); }
       catch (er) { toast(/LIMITE_PLAN/.test(er.message) ? 'La tienda llegó al límite de su plan' : er.message); b.disabled = false; }
