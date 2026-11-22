@@ -1,0 +1,12 @@
+{
+  "name": "EmprenLive",
+  "short_name": "EmprenLive",
+  "description": "Chatea, vende y publica tu Mostrador de 24 horas.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3EFE9",
+  "theme_color": "#E0313B",
+  "lang": "es-CL",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
