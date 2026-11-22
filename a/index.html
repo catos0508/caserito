@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>EmprenLive</title>
+<meta name="description" content="Compra directo a emprendedores en EmprenLive: vivos, Mostrador y pedidos por WhatsApp.">
+<meta name="theme-color" content="#E0313B">
+<style>
+  @font-face{font-family:Jakarta;src:url('../admin/fonts/pjs-600.woff2') format('woff2');font-weight:600}
+  @font-face{font-family:Jakarta;src:url('../admin/fonts/pjs-800.woff2') format('woff2');font-weight:800}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Jakarta,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#F6F5F2;color:#18181B;min-height:100vh}
+  .top{background:linear-gradient(135deg,#E0313B,#FF6A3D);color:#fff;padding:28px 20px 70px;text-align:center;position:relative;overflow:hidden}
+  .top::after{content:"";position:absolute;width:260px;height:260px;border-radius:50%;background:rgba(255,255,255,.12);right:-80px;top:-90px}
+  .brand{font-weight:800;letter-spacing:.06em;font-size:13px;opacity:.95}
+  .card{max-width:460px;margin:-52px auto 0;background:#fff;border-radius:24px;box-shadow:0 18px 40px rgba(24,24,27,.12);padding:22px;position:relative;z-index:1}
+  .av{width:92px;height:92px;border-radius:50%;margin:-70px auto 10px;border:4px solid #fff;background:#FDE8E9;display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#C2262E;overflow:hidden;box-shadow:0 8px 20px rgba(0,0,0,.12)}
+  .av img{width:100%;height:100%;object-fit:cover}
+  h1{margin:0;text-align:center;font-size:24px}
+  .al{display:block;text-align:center;color:#E0313B;font-weight:800;margin-top:2px}
+  .meta{text-align:center;color:#71717A;font-size:14px;margin:6px 0 0}
+  .desc{text-align:center;font-size:14px;line-height:1.5;margin:12px 0 0}
+  .btn{display:block;text-align:center;text-decoration:none;font-weight:800;border-radius:14px;padding:15px;margin-top:12px;font-size:16px}
+  .b1{background:#18181B;color:#fff}
+  .b2{background:#F4F4F5;color:#18181B;font-size:14px}
+  .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:18px}
+  .p{border-radius:12px;overflow:hidden;background:#F4F4F5;aspect-ratio:1;position:relative}
+  .p img{width:100%;height:100%;object-fit:cover}
+  .p span{position:absolute;left:6px;bottom:6px;background:rgba(255,255,255,.95);border-radius:999px;font-size:11px;font-weight:800;padding:2px 7px;color:#E0313B}
+  .foot{text-align:center;color:#A1A1AA;font-size:12px;margin:22px 0 30px}
+  .msg{text-align:center;padding:20px 0}
+</style>
+</head>
+<body>
+<div class="top"><div class="brand">EMPRENLIVE</div></div>
+<div class="card" id="c"><div class="msg">Cargando…</div></div>
+<p class="foot">EmprenLive · Vitrinas en vivo · Las compras se coordinan directo con cada tienda por WhatsApp.</p>
+<script>
+(function () {
+  var URL0 = 'https://otxigqqzczzsckhsaggq.supabase.co', KEY = 'sb_publishable_Osm049nAqujqAtTNdGidxQ_r-j_2qgp';
+  var H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+  var c = document.getElementById('c');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]; }); }
+  var alias = decodeURIComponent((location.hash || '').replace(/^#\/?@?/, '') || new URLSearchParams(location.search).get('a') || '').toLowerCase().replace(/[^a-z0-9_.]/g, '');
+  if (!alias) { c.innerHTML = '<div class="msg"><b>Enlace incompleto</b><p class="meta">Falta el @alias.</p></div>'; return; }
+  var app = 'intent://a/' + alias + '#Intent;scheme=cl.caserito.app;package=cl.caserito.app;S.browser_fallback_url=' + encodeURIComponent('https://catos0508.github.io/caserito/') + ';end';
+  var isAndroid = /android/i.test(navigator.userAgent);
+  fetch(URL0 + '/rest/v1/rpc/resolve_alias', { method: 'POST', headers: H, body: JSON.stringify({ p_alias: alias }) })
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (!d || !d.username) { c.innerHTML = '<div class="msg"><b>No encontramos a @' + esc(alias) + '</b><p class="meta">Revisa que el enlace esté bien escrito.</p></div>'; return; }
+      var s = d.store, name = s ? s.name : d.name, pic = (s && s.logo) || d.avatar;
+      document.title = name + ' (@' + d.username + ') · EmprenLive';
+      c.innerHTML = '<div class="av">' + (pic ? '<img src="' + esc(pic) + '" alt="" referrerpolicy="no-referrer">' : esc(name.slice(0, 1).toUpperCase())) + '</div>' +
+        '<h1>' + esc(name) + '</h1><span class="al">@' + esc(d.username) + '</span>' +
+        (s && s.city ? '<p class="meta">' + esc(s.city) + '</p>' : '') + (s && s.description ? '<p class="desc">' + esc(s.description) + '</p>' : '') +
+        (isAndroid ? '<a class="btn b1" href="' + app + '">' + (s ? 'Ver la tienda en la app' : 'Abrir en la app') + '</a>' : '<a class="btn b1" href="../">Conoce EmprenLive</a>') +
+        '<a class="btn b2" href="../">¿No tienes la app? Conoce EmprenLive</a><div class="grid" id="g"></div>';
+      if (!s) return;
+      fetch(URL0 + '/rest/v1/products?select=id,name,price,photo&store_id=eq.' + s.id + '&active=eq.true&order=created_at.desc&limit=6', { headers: H })
+        .then(function (r) { return r.json(); }).then(function (ps) {
+          if (!Array.isArray(ps)) return;
+          document.getElementById('g').innerHTML = ps.map(function (p) {
+            return '<a class="p" href="' + (isAndroid ? app : '../') + '">' + (p.photo ? '<img src="' + esc(p.photo) + '" alt="' + esc(p.name) + '" loading="lazy">' : '') + '<span>$' + Number(p.price).toLocaleString('es-CL') + '</span></a>';
+          }).join('');
+        }).catch(function () {});
+    })
+    .catch(function () { c.innerHTML = '<div class="msg"><b>No pudimos cargar el perfil</b><p class="meta">Revisa tu conexión e inténtalo de nuevo.</p></div>'; });
+})();
+</script>
+</body>
+</html>

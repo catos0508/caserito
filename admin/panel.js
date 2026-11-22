@@ -40,6 +40,7 @@
     pedidos: I('<path d="M5 8h14l-1 13H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>'),
     productos: I('<path d="M3 7l9-4 9 4-9 4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>'),
     vivos: I('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/>'),
+    mostrador: I('<rect x="6" y="3" width="12" height="18" rx="3"/><circle cx="12" cy="10" r="3"/><path d="M9 17h6"/>'),
     denuncias: I('<path d="M5 21V4h12l-2 4 2 4H5"/>'),
   };
 
@@ -75,7 +76,7 @@
   }
 
   // ---------- estructura ----------
-  const SECTIONS = [['resumen', 'Resumen'], ['tiendas', 'Tiendas'], ['usuarios', 'Usuarios'], ['pedidos', 'Pedidos'], ['productos', 'Productos'], ['vivos', 'Vivos'], ['denuncias', 'Denuncias']];
+  const SECTIONS = [['resumen', 'Resumen'], ['tiendas', 'Tiendas'], ['usuarios', 'Usuarios'], ['pedidos', 'Pedidos'], ['productos', 'Productos'], ['vivos', 'Vivos'], ['mostrador', 'Mostrador'], ['denuncias', 'Denuncias']];
   function shell() {
     app.innerHTML = `<div class="shell"><aside class="side"><div class="logo"><i></i>EmprenLive</div>
       <nav class="nav" id="nav"></nav>
@@ -258,12 +259,12 @@
   VIEWS.usuarios = async (main) => {
     const users = ok(await sb.from('profiles').select('*').order('created_at', { ascending: false }).limit(2000));
     main.innerHTML = head('Usuarios', `${num(users.length)} cuentas`, '<button class="btn" id="x">Exportar CSV</button>') +
-      `<div class="card"><div class="pad" style="padding-bottom:0"><div class="toolbar"><input class="input" id="q" placeholder="Buscar por nombre o correo">
+      `<div class="card"><div class="pad" style="padding-bottom:0"><div class="toolbar"><input class="input" id="q" placeholder="Buscar por nombre, correo o @alias">
         <select class="select" id="fr"><option value="">Todos los roles</option>${Object.entries(ROLE).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select>
         <select class="select" id="fs"><option value="">Todos</option><option value="active">Activos</option><option value="suspended">Suspendidos</option></select></div></div>
       <div class="table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Teléfono</th><th>Registro</th><th></th></tr></thead><tbody id="tb"></tbody></table></div></div>`;
-    const rows = () => { const q = document.getElementById('q').value.trim().toLowerCase(), r = document.getElementById('fr').value, s = document.getElementById('fs').value; return users.filter((u) => (!q || (u.name + ' ' + u.email).toLowerCase().includes(q)) && (!r || u.role === r) && (!s || u.status === s)); };
-    const draw = () => { document.getElementById('tb').innerHTML = rows().map((u) => `<tr><td><div class="user-cell">${u.avatar ? `<img class="uav" src="${esc(u.avatar)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : `<span class="uav">${esc((u.name || '?').trim().charAt(0).toUpperCase())}</span>`}<div style="min-width:0"><div class="cell-main">${esc(u.name)}</div><div class="cell-sub">${esc(u.email)}</div></div></div></td>
+    const rows = () => { const q = document.getElementById('q').value.trim().toLowerCase(), r = document.getElementById('fr').value, s = document.getElementById('fs').value; return users.filter((u) => (!q || (u.name + ' ' + u.email + ' @' + (u.username || '')).toLowerCase().includes(q)) && (!r || u.role === r) && (!s || u.status === s)); };
+    const draw = () => { document.getElementById('tb').innerHTML = rows().map((u) => `<tr><td><div class="user-cell">${u.avatar ? `<img class="uav" src="${esc(u.avatar)}" alt="" referrerpolicy="no-referrer" loading="lazy">` : `<span class="uav">${esc((u.name || '?').trim().charAt(0).toUpperCase())}</span>`}<div style="min-width:0"><div class="cell-main">${esc(u.name)}</div><div class="cell-sub">${u.username ? '<b style="color:var(--brand,#C2262E)">@' + esc(u.username) + '</b> · ' : ''}${esc(u.email)}</div></div></div></td>
       <td><span class="pill ${u.role === 'admin' ? 'p-brand' : u.role === 'seller' ? 'p-info' : 'p-gray'}">${esc(ROLE[u.role] || u.role)}</span></td>
       <td>${u.status === 'active' ? '<span class="pill p-ok">Activo</span>' : '<span class="pill p-bad">Suspendido</span>'}</td><td class="small">${esc(u.phone || '—')}</td><td class="small muted">${esc(fdate(u.created_at, false))}</td>
       <td><div class="actions">${u.role === 'admin' ? '' : u.status === 'active' ? `<button class="btn sm danger" data-u="${u.id}" data-s="suspended">Suspender</button>` : `<button class="btn sm ok" data-u="${u.id}" data-s="active">Reactivar</button>`}</div></td></tr>`).join('') || '<tr><td colspan="6" class="empty">Sin resultados</td></tr>'; };
@@ -336,6 +337,23 @@
     main.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-end]'); if (!b) return; if (!confirmInline(b, '¿Terminar?')) return; b.disabled = true;
       try { ok(await sb.rpc('admin_end_live', { p_id: Number(b.dataset.end) })); toast('Vivo terminado'); route(); } catch (er) { toast(er.message); b.disabled = false; }
+    });
+  };
+
+  VIEWS.mostrador = async (main) => {
+    const items = ok(await sb.rpc('admin_mostrador'));
+    const vig = items.filter((x) => x.vigente);
+    main.innerHTML = head('Mostrador', `${num(vig.length)} publicaciones activas · se borran solas a las 24 h`) +
+      `<div class="toolbar" style="margin-bottom:14px"><select class="select" id="fv"><option value="1">Activas</option><option value="">Todas (últimas 300)</option></select></div><div class="most-adm" id="mg"></div>`;
+    const draw = () => { const v = document.getElementById('fv').value; const list = items.filter((x) => !v || x.vigente);
+      document.getElementById('mg').innerHTML = list.map((x) => `<div class="card most-card"><div class="most-ph">${x.photo ? `<img src="${esc(x.photo)}" alt="" loading="lazy">` : ''}${x.vigente ? '' : '<span class="pill p-gray" style="position:absolute;left:8px;top:8px">Vencida</span>'}</div>
+        <div class="pad" style="padding:10px 12px"><div class="cell-main">${esc(x.store)}</div><div class="small">${esc(x.caption || '—')}</div><div class="cell-sub">👁 ${num(x.views)} · ❤️ ${num(x.likes)} · ${esc(fdate(x.created_at))}</div>
+        <button class="btn sm danger" style="margin-top:8px;width:100%" data-dm="${x.id}">Eliminar</button></div></div>`).join('') || '<div class="card empty">No hay publicaciones.</div>'; };
+    draw(); document.getElementById('fv').addEventListener('input', draw);
+    main.addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-dm]'); if (!b) return;
+      if (!(await confirmDelete('¿Eliminar esta publicación del Mostrador?', 'Desaparece para todos de inmediato.'))) return;
+      b.disabled = true; try { ok(await sb.rpc('delete_mostrador', { p_id: Number(b.dataset.dm) })); toast('Publicación eliminada'); route(); } catch (er) { toast(er.message); b.disabled = false; }
     });
   };
 
