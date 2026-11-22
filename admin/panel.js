@@ -144,7 +144,8 @@
       ${bar('Base de datos', u.db_bytes, L.db_bytes, MB(u.db_bytes) + ' de 500 MB')}
       ${bar('Fotos guardadas', u.storage_bytes, L.storage_bytes, MB(u.storage_bytes) + ' de 1 GB · ' + num(u.photos) + ' fotos')}
       ${bar('Usuarios activos del mes', u.mau, L.mau, num(u.mau) + ' de 50.000')}
-      <div class="u-foot small muted">${num(u.users)} cuentas · ${num(u.stores)} tiendas · ${num(u.products)} productos · ${num(u.messages)} mensajes · ${num(u.camera_lives_30d)} vivos con cámara en 30 días (Agora regala 10.000 min/mes)</div></div>`;
+      ${u.live_min !== undefined ? bar('Minutos de video del mes (vivos con cámara)', u.live_min, L.agora_min, num(u.live_min) + ' de ' + num(L.agora_min) + ' · gratis: ' + num(u.live_min_gratis) + ' de ' + num(L.agora_min_gratis)) : ''}
+      <div class="u-foot small muted">${num(u.users)} cuentas · ${num(u.stores)} tiendas · ${num(u.products)} productos · ${num(u.messages)} mensajes · ${num(u.groups || 0)} grupos · ${num(u.camera_lives_30d)} vivos con cámara en 30 días · al llegar al tope de minutos la cámara se pausa hasta el día 1 (Agora no cobra)</div></div>`;
   }
 
   VIEWS.resumen = async (main) => {
