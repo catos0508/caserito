@@ -134,13 +134,28 @@
   // ---------- vistas ----------
   const VIEWS = {};
 
+  // Medidor del plan gratis de Supabase (y vivos con cámara de Agora)
+  const MB = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
+  function usageCard(u) {
+    const L = u.limits || {};
+    const bar = (lab, val, lim, txt) => { const p = Math.min(100, lim ? val / lim * 100 : 0); const cls = p >= 85 ? 'bad' : p >= 60 ? 'warn' : 'ok';
+      return `<div class="u-row"><div class="u-top"><span>${lab}</span><b>${txt}</b></div><div class="u-bar ${cls}"><i style="width:${Math.max(p, 1.5)}%"></i></div></div>`; };
+    return `<div class="card pad usage"><div class="u-head"><b>Plan gratis · uso actual</b><span class="small muted">Si alguna barra pasa el 85 %, es momento de pasar a Supabase Pro (US$25/mes, precio fijo).</span></div>
+      ${bar('Base de datos', u.db_bytes, L.db_bytes, MB(u.db_bytes) + ' de 500 MB')}
+      ${bar('Fotos guardadas', u.storage_bytes, L.storage_bytes, MB(u.storage_bytes) + ' de 1 GB · ' + num(u.photos) + ' fotos')}
+      ${bar('Usuarios activos del mes', u.mau, L.mau, num(u.mau) + ' de 50.000')}
+      <div class="u-foot small muted">${num(u.users)} cuentas · ${num(u.stores)} tiendas · ${num(u.products)} productos · ${num(u.messages)} mensajes · ${num(u.camera_lives_30d)} vivos con cámara en 30 días (Agora regala 10.000 min/mes)</div></div>`;
+  }
+
   VIEWS.resumen = async (main) => {
     const d = ok(await sb.rpc('admin_dashboard', { p_days: state.days })); state.dash = d; nav('resumen');
+    const usageP = sb.rpc('admin_usage').then((r) => r.data).catch(() => null);
+    setTimeout(async () => { const u = await usageP; const box = document.getElementById('usage'); if (u && box) box.innerHTML = usageCard(u); }, 0);
     const k = d.kpi;
     const M = { orders: ['Pedidos', num], sales: ['Ventas', clp], users: ['Usuarios nuevos', num], devices: ['Visitantes únicos', num], views: ['Vistas', num], clicks: ['Clics en Pedir', num], messages: ['Mensajes', num] };
     main.innerHTML = head('Resumen', `Datos reales de los últimos ${d.days} días · actualizado ${esc(fdate(d.generated_at))}`,
       `<div class="seg" id="days">${[7, 30, 90].map((n) => `<button data-d="${n}" class="${state.days === n ? 'on' : ''}">${n} días</button>`).join('')}</div><button class="btn" id="reload">Actualizar</button>`) +
-      `<div class="grid alerts">
+      `<div id="usage"></div><div class="grid alerts">
         <a class="card alert" href="#/tiendas?f=pending"><span class="ic" style="background:var(--warn-bg);color:var(--warn)">!</span><div><b>${num(k.stores_pending)}</b><br><span>Tiendas por aprobar</span></div></a>
         <a class="card alert" href="#/tiendas?f=req"><span class="ic" style="background:#F1E9FF;color:#5B21B6">★</span><div><b>${num(k.plan_requests)}</b><br><span>Solicitudes de plan</span></div></a>
         <a class="card alert" href="#/denuncias"><span class="ic" style="background:var(--bad-bg);color:var(--bad)">⚑</span><div><b>${num(k.reports_open)}</b><br><span>Denuncias abiertas</span></div></a>
