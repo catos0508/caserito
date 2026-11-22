@@ -6,6 +6,8 @@
   const SB_KEY = 'sb_publishable_Osm049nAqujqAtTNdGidxQ_r-j_2qgp';
   const DEMO = new URLSearchParams(location.search).has('demo');
   const STORY_MS = 6000;
+  const ANDROID = window.EmprenLiveAndroid || null;          // dentro del APK
+  const PUBLIC_URL = 'https://catos0508.github.io/caserito/app/'; // dirección pública para los enlaces @alias
 
   // ===================================================================== utilidades
   const $ = (s, r = document) => r.querySelector(s);
@@ -108,7 +110,13 @@
     const api = {
       demo: false,
       async session() { const { data } = await sb.auth.getSession(); uid = data.session?.user.id || null; return data.session?.user || null; },
-      google() { return sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } }); },
+      async google() {
+        if (!ANDROID) return sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: location.origin + location.pathname, queryParams: { prompt: 'select_account' } } });
+        // En el APK Google no permite iniciar sesión dentro de la app: se abre el navegador y vuelve por emprenlive://auth
+        const { data, error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'emprenlive://auth', skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } } });
+        if (error) throw error;
+        ANDROID.openExternal(data.url);
+      },
       async login(email, password) { ok(await sb.auth.signInWithPassword({ email, password })); },
       async register(email, password, name) {
         const d = ok(await sb.auth.signUp({ email, password, options: { data: { name, full_name: name }, emailRedirectTo: location.origin + location.pathname } }));
@@ -397,7 +405,7 @@
         <p class="demo-link">¿Solo quieres mirar? <a href="?demo">Prueba la demo</a></p>
       </form></section></div>`;
     root.querySelectorAll('[data-m]').forEach((b) => { b.onclick = () => authView('', b.dataset.m); });
-    $('#gBtn').onclick = () => api.google();
+    $('#gBtn').onclick = () => Promise.resolve(api.google()).catch((er) => authView(er.message, mode));
     $('#af').onsubmit = async (e) => {
       e.preventDefault(); const f = e.target, b = f.querySelector('[type=submit]'); b.disabled = true;
       try {
@@ -569,7 +577,7 @@
       </div>
       <p class="small muted" style="padding:12px 16px"><a href="../privacidad.html" target="_blank">Privacidad</a> · <a href="../terminos.html" target="_blank">Términos</a> · <a href="../eliminar-cuenta.html" target="_blank">Eliminar cuenta</a></p>`;
   }
-  const shareLink = (u) => location.origin + location.pathname + '#@' + u;
+  const shareLink = (u) => (location.protocol === 'https:' && !ANDROID ? location.origin + location.pathname : PUBLIC_URL) + '#@' + u;
   function applyTheme(t) { if (t === 'dark' || t === 'light') document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 
   // ---------------------------------------------------------- panel derecho
@@ -628,7 +636,7 @@
       <div style="display:flex;gap:12px;align-items:center">${av(S.me, 56)}<div><b style="font-size:18px">${esc(S.me.name || '')}</b><div class="muted">@${esc(S.me.username)}</div></div></div>
       <p style="margin:0">Pega este enlace en tu bio de Instagram, TikTok o en tus publicaciones. Quien lo abra entra directo a un chat contigo y te queda como contacto.</p>
       <div class="share">${I(IC.link, 18)}<span class="ell">${esc(link)}</span><button class="btn sm brand" data-act="copyLink">Copiar</button></div>
-      ${navigator.share ? '<button class="btn" data-act="shareLink">Compartir…</button>' : ''}
+      ${navigator.share || ANDROID ? '<button class="btn" data-act="shareLink">Compartir…</button>' : ''}
       <p class="small muted" style="margin:0">También pueden encontrarte en "Nuevo chat" escribiendo <b>@${esc(S.me.username)}</b>.</p></div></div>`;
   }
 
@@ -1079,7 +1087,8 @@
       case 'attProduct': $('#att').innerHTML = ''; sendProductModal(); break;
       case 'zoom': { const lb = document.createElement('div'); lb.className = 'lightbox'; lb.innerHTML = `<img src="${esc(b.src)}" alt="">`; lb.onclick = () => lb.remove(); layer.appendChild(lb); break; }
       case 'copyLink': try { await navigator.clipboard.writeText(shareLink(S.me.username)); toast('Enlace copiado'); } catch { toast(shareLink(S.me.username)); } break;
-      case 'shareLink': navigator.share({ title: 'Escríbeme en EmprenLive', text: `Hazme tu pedido por chat: @${S.me.username}`, url: shareLink(S.me.username) }).catch(() => {}); break;
+      case 'shareLink': if (ANDROID) { ANDROID.share(`Hazme tu pedido por chat en EmprenLive: @${S.me.username} ${shareLink(S.me.username)}`); break; }
+        navigator.share({ title: 'Escríbeme en EmprenLive', text: `Hazme tu pedido por chat: @${S.me.username}`, url: shareLink(S.me.username) }).catch(() => {}); break;
       case 'toggleContact': try { if (b.dataset.on === '1') await api.removeContact(id); else await api.addContact(id); toast(b.dataset.on === '1' ? 'Quitado de contactos' : 'Agregado a contactos'); renderPane(); loadFeed(); } catch (er) { toast(er.message); } break;
       case 'notif': if ('Notification' in window) { await Notification.requestPermission(); renderSide(); } break;
       case 'theme': { const cur = document.documentElement.dataset.theme; const n = !cur ? 'dark' : cur === 'dark' ? 'light' : ''; applyTheme(n); try { localStorage.setItem('el_theme', n); } catch { /* sin almacenamiento */ } renderSide(); break; }
@@ -1088,6 +1097,19 @@
   });
   document.addEventListener('click', (e) => { const att = $('#att'); if (att && att.innerHTML && !e.target.closest('#att') && !e.target.closest('[data-act="attach"]')) att.innerHTML = ''; }, true);
   window.addEventListener('hashchange', () => { if (location.hash.startsWith('#@') && S.me?.username) { const a = location.hash.slice(2); history.replaceState(null, '', location.pathname + location.search); openByAlias(a); } });
+
+  // Botón "atrás" de Android: cierra lo que esté abierto; devuelve false si no queda nada (la app se cierra).
+  window.__elBack = () => {
+    const top = layer.lastElementChild;
+    if (top) { if (top.classList.contains('lightbox')) top.remove(); else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); return true; }
+    const att = $('#att'); if (att && att.innerHTML) { att.innerHTML = ''; return true; }
+    if (!$('#app')) return false;
+    if (isMobile() && S.chat) { closeChatState(); renderSide(); renderPane(); return true; }
+    if (isMobile() && S.pane) { S.pane = null; renderPane(); renderSide(); return true; }
+    if (S.side) { S.side = null; renderSide(); return true; }
+    if (S.tab !== 'chats') { S.tab = 'chats'; renderTabs(); renderSide(); return true; }
+    return false;
+  };
 
   boot();
 })();

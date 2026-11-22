@@ -1,0 +1,32 @@
+// EmprenLive para Android: envuelve la app web de ../app en un WebView nativo.
+plugins { id 'com.android.application' version '8.7.3' }
+
+android {
+    namespace 'cl.emprenlive.app'
+    compileSdk 35
+    defaultConfig {
+        applicationId 'cl.emprenlive.app'
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName '1.0'
+    }
+    buildTypes {
+        release { minifyEnabled false }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.assets.srcDirs += layout.buildDirectory.dir('webassets')
+}
+
+// Copia el sitio (app web, políticas, librería y fuentes) dentro del APK en assets/www
+def copyWeb = tasks.register('copyWeb', Sync) {
+    from(rootDir.parentFile) {
+        include 'app/**', 'index.html', 'terminos.html', 'privacidad.html', 'eliminar-cuenta.html'
+        include 'admin/vendor/**', 'admin/fonts/**'
+    }
+    into layout.buildDirectory.dir('webassets/www')
+}
+tasks.named('preBuild') { dependsOn copyWeb }
