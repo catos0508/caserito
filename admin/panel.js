@@ -56,7 +56,7 @@
   }
   function loginView(err = '') {
     app.innerHTML = `<div class="login"><div class="login-art"><div class="logo"><i></i>EmprenLive</div>
-      <div><h1>Panel de administración</h1><p>Tiendas, pedidos, vivos, planes y analítica en tiempo real de toda la plataforma.</p></div>
+      <div><h1>Panel de administración</h1><p>Tiendas, usuarios, grupos, historias, planes y analítica de toda la plataforma.</p></div>
       <span class="small" style="opacity:.6;position:relative">Acceso exclusivo para administradores</span></div>
       <div class="login-box"><form class="login-card" id="loginForm">
         <div class="logo"><i></i>EmprenLive</div><h2 style="font-size:24px">Ingresar al panel</h2>
@@ -76,7 +76,7 @@
   }
 
   // ---------- estructura ----------
-  const SECTIONS = [['resumen', 'Resumen'], ['tiendas', 'Tiendas'], ['usuarios', 'Usuarios'], ['pedidos', 'Pedidos'], ['productos', 'Productos'], ['vivos', 'Vivos'], ['mostrador', 'Mostrador'], ['denuncias', 'Denuncias']];
+  const SECTIONS = [['resumen', 'Resumen'], ['tiendas', 'Tiendas'], ['usuarios', 'Usuarios'], ['productos', 'Productos'], ['mostrador', 'Mostrador'], ['denuncias', 'Denuncias']];
   function shell() {
     app.innerHTML = `<div class="shell"><aside class="side"><div class="logo"><i></i>EmprenLive</div>
       <nav class="nav" id="nav"></nav>
@@ -134,7 +134,7 @@
   // ---------- vistas ----------
   const VIEWS = {};
 
-  // Medidor del plan gratis de Supabase (y vivos con cámara de Agora)
+  // Medidor del plan gratis de Supabase
   const MB = (b) => (b / 1048576).toFixed(b < 10485760 ? 1 : 0) + ' MB';
   function usageCard(u) {
     const L = u.limits || {};
@@ -144,14 +144,13 @@
       ${bar('Base de datos', u.db_bytes, L.db_bytes, MB(u.db_bytes) + ' de 500 MB')}
       ${bar('Fotos guardadas', u.storage_bytes, L.storage_bytes, MB(u.storage_bytes) + ' de 1 GB · ' + num(u.photos) + ' fotos')}
       ${bar('Usuarios activos del mes', u.mau, L.mau, num(u.mau) + ' de 50.000')}
-      ${u.live_min !== undefined ? bar('Minutos de video del mes (vivos con cámara)', u.live_min, L.agora_min, num(u.live_min) + ' de ' + num(L.agora_min) + ' · gratis: ' + num(u.live_min_gratis) + ' de ' + num(L.agora_min_gratis)) : ''}
-      <div class="u-foot small muted">${num(u.users)} cuentas · ${num(u.stores)} tiendas · ${num(u.products)} productos · ${num(u.messages)} mensajes · ${num(u.groups || 0)} grupos · ${num(u.camera_lives_30d)} vivos con cámara en 30 días · al llegar al tope de minutos la cámara se pausa hasta el día 1 (Agora no cobra)</div></div>`;
+      <div class="u-foot small muted">${num(u.users)} cuentas · ${num(u.stores)} tiendas · ${num(u.products)} productos · ${num(u.messages)} mensajes · ${num(u.groups || 0)} grupos</div></div>`;
   }
 
   VIEWS.resumen = async (main) => {
     const d = ok(await sb.rpc('admin_dashboard', { p_days: state.days })); state.dash = d; nav('resumen');
     const usageP = sb.rpc('admin_usage').then((r) => r.data).catch(() => null);
-    setTimeout(async () => { const u = await usageP; const box = document.getElementById('usage'); if (u && box) box.innerHTML = usageCard(u); }, 0);
+    setTimeout(async () => { const u = await usageP; const box = document.getElementById('usage'); if (u && box) box.innerHTML = usageCard(u); const kg = document.getElementById('kpiGroups'); if (kg && u) kg.textContent = num(u.groups || 0); }, 0);
     const k = d.kpi;
     const M = { orders: ['Pedidos', num], sales: ['Ventas', clp], users: ['Usuarios nuevos', num], devices: ['Visitantes únicos', num], views: ['Vistas', num], clicks: ['Clics en Pedir', num], messages: ['Mensajes', num] };
     main.innerHTML = head('Resumen', `Datos reales de los últimos ${d.days} días · actualizado ${esc(fdate(d.generated_at))}`,
@@ -160,16 +159,13 @@
         <a class="card alert" href="#/tiendas?f=pending"><span class="ic" style="background:var(--warn-bg);color:var(--warn)">!</span><div><b>${num(k.stores_pending)}</b><br><span>Tiendas por aprobar</span></div></a>
         <a class="card alert" href="#/tiendas?f=req"><span class="ic" style="background:#F1E9FF;color:#5B21B6">★</span><div><b>${num(k.plan_requests)}</b><br><span>Solicitudes de plan</span></div></a>
         <a class="card alert" href="#/denuncias"><span class="ic" style="background:var(--bad-bg);color:var(--bad)">⚑</span><div><b>${num(k.reports_open)}</b><br><span>Denuncias abiertas</span></div></a>
-        <a class="card alert" href="#/vivos"><span class="ic" style="background:var(--brand-soft);color:var(--brand)"><span class="dot ${k.lives_now ? 'live' : ''}"></span></span><div><b>${num(k.lives_now)}</b><br><span>Vivos en este momento</span></div></a>
       </div>
       <div class="grid kpis">
         <div class="card kpi accent"><span class="lab">Ingreso mensual por planes</span><span class="val">${clp(k.mrr)}</span><span class="hint">${num(k.plan_profesional)} Profesional · ${num(k.plan_destacado)} Destacado</span></div>
-        <div class="card kpi"><span class="lab">Ventas registradas</span><span class="val">${clp(k.sales)}</span><span class="hint">${num(k.orders)} pedidos · ticket promedio ${clp(k.avg_ticket)}</span></div>
-        <div class="card kpi"><span class="lab">Pedidos hoy</span><span class="val">${num(k.orders_today)}</span><span class="hint">${num(k.orders_total)} desde el inicio</span></div>
         <div class="card kpi"><span class="lab">Visitantes únicos</span><span class="val">${num(k.devices_7d)}</span><span class="hint">últimos 7 días · ${num(k.devices_today)} hoy</span></div>
         <div class="card kpi"><span class="lab">Usuarios registrados</span><span class="val">${num(k.users)}</span><span class="hint">+${num(k.users_new)} en el período · ${num(k.sellers)} vendedores</span></div>
         <div class="card kpi"><span class="lab">Tiendas activas</span><span class="val">${num(k.stores_approved)}</span><span class="hint">${num(k.stores)} en total · ${num(k.products_active)} productos publicados</span></div>
-        <div class="card kpi"><span class="lab">Vivos</span><span class="val">${num(k.lives)}</span><span class="hint">${num(k.lives_camera)} con cámara · ${num(k.views_live)} espectadores</span></div>
+        <div class="card kpi"><span class="lab">Grupos</span><span class="val" id="kpiGroups">…</span><span class="hint">comunidades de emprendedores</span></div>
         <div class="card kpi"><span class="lab">Conversaciones</span><span class="val">${num(k.messages)}</span><span class="hint">mensajes en el período · ${num(k.follows)} seguidores totales</span></div>
       </div>
       <div class="grid two" style="margin-bottom:14px">
